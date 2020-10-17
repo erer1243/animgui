@@ -108,7 +108,7 @@ fn main() {
     let mut camera = Camera::new();
 
     // For keeping track of project data
-    let project = Project::default();
+    let mut project = Project::default();
     // project
     //     .load_obj_from_file(&display, "cube.obj")
     //     .expect("Loading cube.obj");
@@ -152,10 +152,14 @@ fn main() {
                     matrix: mat4_to_array(&(camera.camera_mat() * obj.model_mat()))
                 };
 
-                let mesh = &project.meshes[&obj.mesh_id];
-
                 target
-                    .draw(&mesh.vb, &mesh.ib, &program, &uniforms, &draw_params)
+                    .draw(
+                        &obj.mesh.vb,
+                        &obj.mesh.ib,
+                        &program,
+                        &uniforms,
+                        &draw_params,
+                    )
                     .unwrap();
             }
 

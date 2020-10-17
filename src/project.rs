@@ -6,14 +6,12 @@ TODO:
 */
 use crate::{mesh::Mesh, Object, Vertex};
 use glium::Display;
-use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
-
-pub type Id = usize;
+use std::{fs::File, io::BufReader, path::Path};
 
 // Project state
 #[derive(Default)]
 pub struct Project {
-    pub meshes: HashMap<Id, Mesh>,
+    pub meshes: Vec<Mesh>,
     pub objs: Vec<Object>,
 }
 

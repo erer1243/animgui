@@ -8,8 +8,7 @@ TODO:
       only when needed, rather than for every frame
     * Keyframe animating. Maybe this should go in the object struct?
 */
-
-use crate::project::Id;
+use crate::mesh::Mesh;
 use nalgebra_glm as glm;
 
 pub struct Object {
@@ -20,17 +19,17 @@ pub struct Object {
     pub color: [f32; 3],
 
     // Mesh data
-    pub mesh_id: Id,
+    pub mesh: Mesh,
 }
 
 impl Object {
-    pub fn new<T: ToString>(mesh_id: Id) -> Object {
+    pub fn new<T: ToString>(mesh: Mesh, indices: &[u16]) -> Object {
         Object {
             position: glm::zero(),
             rotation: glm::zero(),
             scale: glm::vec3(1., 1., 1.),
             color: [1.; 3],
-            mesh_id,
+            mesh,
         }
     }
 

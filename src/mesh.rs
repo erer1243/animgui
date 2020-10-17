@@ -5,44 +5,32 @@ cloning.
 
 TODO: (these structs  are pretty simple, probably will not need any new features)
 */
+use std::rc::Rc;
+use std::ops::Deref;
 use crate::vertex::Vertex;
 use glium::{index::PrimitiveType::TrianglesList, Display, IndexBuffer, VertexBuffer};
 
-pub struct Mesh {
-    pub name: String,
-    pub vb: VertexBuffer<Vertex>,
-    pub ib: IndexBuffer<u16>,
-}
+#[derive(Clone)]
+pub struct Mesh(Rc<MeshInternals>);
 
 impl Mesh {
     pub fn new(display: &Display, name: String, verts: &[Vertex], inds: &[u16]) -> Mesh {
         let vb = VertexBuffer::new(display, verts).unwrap();
         let ib = IndexBuffer::new(display, TrianglesList, inds).unwrap();
-        Mesh { name, vb, ib }
+        Mesh(Rc::new(MeshInternals { name, vb, ib }))
     }
 }
 
-// #[derive(Clone)]
-// pub struct Mesh(Rc<MeshInternals>);
+impl Deref for Mesh {
+    type Target = MeshInternals;
 
-// impl Mesh {
-//     pub fn new(display: &Display, name: String, verts: &[Vertex], inds: &[u16]) -> Mesh {
-//         let vb = VertexBuffer::new(display, verts).unwrap();
-//         let ib = IndexBuffer::new(display, TrianglesList, inds).unwrap();
-//         Mesh(Rc::new(MeshInternals { name, vb, ib }))
-//     }
-// }
+    fn deref(&self) -> &MeshInternals {
+        &self.0
+    }
+}
 
-// impl Deref for Mesh {
-//     type Target = MeshInternals;
-
-//     fn deref(&self) -> &MeshInternals {
-//         &self.0
-//     }
-// }
-
-// pub struct MeshInternals {
-//     pub name: String,
-//     pub vb: VertexBuffer<Vertex>,
-//     pub ib: IndexBuffer<u16>,
-// }
+pub struct MeshInternals {
+    pub name: String,
+    pub vb: VertexBuffer<Vertex>,
+    pub ib: IndexBuffer<u16>,
+}
