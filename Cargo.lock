@@ -50,6 +50,7 @@ dependencies = [
  "imgui-glium-renderer",
  "imgui-winit-support",
  "nalgebra-glm",
+ "obj-rs",
  "winit",
 ]
 
@@ -806,6 +807,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "obj-rs"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf37dd242b0636bf442a539738f54330b0db9ad9758a89de154e9d3866a7847e"
+dependencies = [
+ "num-traits",
+ "serde",
+ "vec_map",
+]
+
+[[package]]
 name = "objc"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1093,6 +1105,20 @@ name = "serde"
 version = "1.0.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96fe57af81d28386a513cbc6858332abc6117cfdb5999647c6444b8f43a370a5"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.116"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f630a6370fd8e457873b4bd2ffdae75408bc291ba72be773772a4c2a065d9ae8"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn",
+]
 
 [[package]]
 name = "shared_library"
@@ -1196,6 +1222,12 @@ name = "unicode-xid"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
+
+[[package]]
+name = "vec_map"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "void"

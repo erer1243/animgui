@@ -1,11 +1,29 @@
-#![allow(dead_code)]
-#![allow(unused_mut)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
+/*
+This file contains window and imgui initialization code along with the main event loop
+used to render the UI and models, control camera position and angle, etc. There should be zero
+glium rendering code outside of this file. All mesh rendering is done here.
 
-mod shaders;
+TODO:
+    * Adjustable mouse speed
+    * Improve mouse input in general
+    * Adjustable camera move speed
+    * Add axis markers, like in blender
+*/
+// #![allow(dead_code)]
+// #![allow(unused_mut)]
+// #![allow(unused_imports)]
+// #![allow(unused_variables)]
+
+mod camera;
+mod controls;
+mod mesh;
 mod object;
+mod project;
+mod shaders;
+mod vertex;
 
+use camera::Camera;
+use controls::CameraControls;
 use glium::{glutin, program, uniform, Surface};
 use glutin::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -13,20 +31,15 @@ use glutin::{
         ElementState::*,
         Event,
         MouseButton::Right,
-        WindowEvent::{CloseRequested, CursorMoved, MouseInput},
+        WindowEvent::{CloseRequested, CursorMoved, KeyboardInput, MouseInput},
     },
     event_loop::ControlFlow,
 };
 use nalgebra_glm as glm;
-use std::{f32::consts::PI, time::Instant};
-use object::{Object, Vertex};
-
-/*
-Todo list
-    * Mouse speed adjustment
-    * Add an axis marker at origin
-    * Add click to select model functionality
-*/
+use object::Object;
+use project::Project;
+use std::time::Instant;
+use vertex::Vertex;
 
 fn main() {
     // Make window
@@ -75,23 +88,12 @@ fn main() {
     .expect("Failed to compile shaders");
 
     // Make triangle
-    let triangle = Object::new(
-        &display,
-        &vertices!(-0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.0, 0.5, 0.0),
-        &[0, 1, 2],
-    );
-
-    let mut cube = Object::new(
-        &display,
-        &vertices!(
-            -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0, 1.0,
-            -1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0
-        ),
-        &[
-            0, 1, 2, 2, 3, 0, 1, 5, 6, 6, 2, 1, 7, 6, 5, 5, 4, 7, 4, 0, 3, 3, 7, 4, 4, 5, 1, 1, 0,
-            4, 3, 2, 6, 6, 7, 3,
-        ],
-    );
+    // let triangle = Object::new(
+    //     &display,
+    //     Some("Triangle"),
+    //     &vertices!(-0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.0, 0.5, 0.0),
+    //     &[0, 1, 2],
+    // );
 
     display.gl_window().window().set_visible(true);
 
@@ -99,19 +101,31 @@ fn main() {
     // For imgui to know how long between frames
     let mut last_frame = Instant::now();
 
-    // For fun shapes
-    // let start = Instant::now();
-
     // For camera control
-    let mut mouse = CameraMouse::default();
+    let mut controls = CameraControls::default();
 
     // For rendering from camera perspective
     let mut camera = Camera::new();
 
+    // For keeping track of project data
+    let mut project = Project::default();
+    // project
+    //     .load_obj_from_file(&display, "cube.obj")
+    //     .expect("Loading cube.obj");
+
     // Main loop
     // =============================================================================================
     event_loop.run(move |event, _, control_flow| match event {
+        // Draw frame
+        // =========================================================================================
         Event::RedrawRequested(_) => {
+            // Move camera based on WASD Shift and Space inputs
+            if controls.rmb_held() {
+                camera.move_up(controls.up_movement() / 100.);
+                camera.move_right(controls.right_movement() / 100.);
+                camera.move_forward(controls.forward_movement() / 100.);
+            }
+
             // Do imgui drawing
             let mut ui = imgui.frame();
             draw_ui(&mut ui);
@@ -121,30 +135,35 @@ fn main() {
             let mut target = display.draw();
             target.clear_color_and_depth((0.0, 0.2, 0.2, 1.0), 1.);
 
-            let matrix = camera.camera_mat() * triangle.model_mat();
-
-            let uniforms = uniform! {
-                color: triangle.color,
-                matrix: mat4_to_array(&matrix),
+            let draw_params = glium::draw_parameters::DrawParameters {
+                // Specify depth buffer functionality
+                depth: glium::Depth {
+                    test: glium::DepthTest::IfLess,
+                    write: true,
+                    ..Default::default()
+                },
+                ..Default::default()
             };
 
-            target
-                .draw(
-                    &triangle.vb,
-                    &triangle.ib,
-                    &program,
-                    &uniforms,
-                    &glium::draw_parameters::DrawParameters {
-                        // Specify depth buffer functionality
-                        depth: glium::Depth {
-                            test: glium::DepthTest::IfLess,
-                            write: true,
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
+            // Draw objects in project
+            for obj in project.objs.iter() {
+                let uniforms = uniform! {
+                    color: obj.color,
+                    matrix: mat4_to_array(&(camera.camera_mat() * obj.model_mat()))
+                };
+
+                let mesh = &project.meshes[&obj.mesh_id];
+
+                target
+                    .draw(
+                        &mesh.vb,
+                        &mesh.ib,
+                        &program,
+                        &uniforms,
+                        &draw_params,
+                    )
+                    .unwrap();
+            }
 
             // Draw imgui ui
             renderer.render(&mut target, ui.render()).unwrap();
@@ -153,7 +172,9 @@ fn main() {
             target.finish().unwrap();
         }
 
-        // Handle right click press (to move camera)
+        // Handle inputs for camera movement
+        // =========================================================================================
+        // Handle pressing/release RMB
         Event::WindowEvent {
             event:
                 MouseInput {
@@ -169,33 +190,33 @@ fn main() {
             match state {
                 Pressed => {
                     // Hide and grab mouse cursor
-                    mouse.grab();
+                    controls.grab();
                     window.set_cursor_grab(true).unwrap();
                     window.set_cursor_visible(false);
                 }
 
                 Released => {
                     // Show and release mouse cursor
-                    mouse.release();
+                    controls.release();
                     window.set_cursor_grab(false).unwrap();
                     window.set_cursor_visible(true);
                 }
             }
         }
 
-        // Handle right click drag (to move camera)
+        // Handle right click drag to move camera
         Event::WindowEvent {
             event: CursorMoved { position, .. },
             ..
-        } if mouse.right_held => {
+        } if controls.rmb_held() => {
             // Get distance mouse moved
-            let (dx, dy) = mouse.moved(position.x, position.y);
+            let (dx, dy) = controls.mouse_moved(position.x, position.y);
 
             // Move camera
-            camera.add_angle(dx / 10., dy / 10.);
+            camera.add_angle(dx / 50., dy / 50.);
 
             // Move mouse back to center of screen
-            mouse.moved(500., 500.);
+            controls.mouse_moved(500., 500.);
             display
                 .gl_window()
                 .window()
@@ -203,14 +224,44 @@ fn main() {
                 .unwrap();
         }
 
+        // Handle pressing WASD to move camera
+        Event::WindowEvent {
+            event: KeyboardInput { input, .. },
+            ..
+        } => {
+            if controls.rmb_held() {
+                let is_pressed = input.state == Pressed;
+
+                match input.scancode {
+                    17 => controls.w_input(is_pressed),
+                    30 => controls.a_input(is_pressed),
+                    31 => controls.s_input(is_pressed),
+                    32 => controls.d_input(is_pressed),
+                    42 => controls.shift_input(is_pressed),
+                    57 => controls.space_input(is_pressed),
+                    _ => (),
+                }
+            }
+        }
+
+        // Handle exiting the program
+        // =========================================================================================
+        Event::WindowEvent {
+            event: CloseRequested,
+            ..
+        } => *control_flow = ControlFlow::Exit,
+
         // Misc event handling for imgui
+        // =========================================================================================
+        // Update imgui internal frame time
         Event::NewEvents(_) => {
             let now = Instant::now();
             imgui.io_mut().update_delta_time(now - last_frame);
             last_frame = now;
         }
 
-        // Misc event handling for imgui
+        // Pre-frame imgui stuff, and request new frame be drawn (Winit does not automatically
+        // request a new frame every time vsync could take one. Must be manually requested).
         Event::MainEventsCleared => {
             platform
                 .prepare_frame(imgui.io_mut(), &display.gl_window().window())
@@ -218,144 +269,13 @@ fn main() {
             display.gl_window().window().request_redraw();
         }
 
-        // Handle exiting the program
-        Event::WindowEvent {
-            event: CloseRequested,
-            ..
-        } => *control_flow = ControlFlow::Exit,
-
-        // Pass events to imgui if not controlling camera
-        ev if !mouse.right_held => {
+        // Pass events to imgui if the user is not controlling camera
+        ev if !controls.rmb_held() => {
             platform.handle_event(imgui.io_mut(), display.gl_window().window(), &ev)
         }
 
         _ => (),
     });
-}
-
-fn mat4_to_array(m: &glm::Mat4) -> [[f32; 4]; 4] {
-    [
-        [m[0], m[1], m[2], m[3]],
-        [m[4], m[5], m[6], m[7]],
-        [m[8], m[9], m[10], m[11]],
-        [m[12], m[13], m[14], m[15]],
-    ]
-}
-
-
-#[derive(Default)]
-struct CameraMouse {
-    // Whether RMB is being held at the moment
-    right_held: bool,
-
-    // If the position of the mouse has been captured since RMB started being held
-    have_pos: bool,
-
-    // The current position of the mouse
-    pos: Option<(f64, f64)>,
-}
-
-impl CameraMouse {
-    fn grab(&mut self) {
-        self.right_held = true;
-    }
-
-    fn release(&mut self) {
-        self.right_held = false;
-        self.pos = None;
-    }
-
-    fn moved(&mut self, xpos: f64, ypos: f64) -> (f32, f32) {
-        match self.pos {
-            Some((prev_x, prev_y)) => {
-                let dx = xpos - prev_x;
-                let dy = ypos - prev_y;
-                self.pos = Some((xpos, ypos));
-                (dx as f32, dy as f32)
-            }
-
-            None => {
-                self.pos = Some((xpos, ypos));
-                (0., 0.)
-            }
-        }
-    }
-}
-
-#[derive(Default)]
-struct Camera {
-    // Camera position
-    pos: glm::Vec3,
-
-    // Angles that the camera is facing
-    pitch: f32,
-    yaw: f32,
-
-    // Position to look at, just in front of the camera
-    // calculated from pitch and yaw
-    front: glm::Vec3,
-
-    // Whether to update mats when camera_mat() is called
-    update_mats: bool,
-
-    // Rendering matrices
-    // proj_mat is projection matrix
-    // camera_mat is proj_mat * view_matrix (calculated in camera_mat())
-    camera_mat: glm::Mat4,
-    proj_mat: glm::Mat4,
-}
-
-impl Camera {
-    fn new() -> Camera {
-        let proj_mat = glm::perspective(
-            1.,                 // Aspect ratio
-            65f32.to_radians(), // Y axis fov
-            0.1,                // Z near
-            100.,               // Z far
-        );
-
-        let mut cam = Camera::default();
-        cam.proj_mat = proj_mat;
-        cam.add_position(2., 0., -1.);
-        cam.add_angle(-208., 0.);
-        cam
-    }
-
-    fn camera_mat(&mut self) -> &glm::Mat4 {
-        if self.update_mats {
-            self.update_mats = false;
-            self.camera_mat = self.proj_mat
-                * glm::look_at(&self.pos, &(self.pos + self.front), &glm::vec3(0., 1., 0.));
-        }
-
-        &self.camera_mat
-    }
-
-    fn add_position(&mut self, dx: f32, dy: f32, dz: f32) {
-        self.update_mats = true;
-        self.pos += glm::vec3(dx, dy, dz);
-    }
-
-    fn add_angle(&mut self, yaw: f32, pitch: f32) {
-        self.update_mats = true;
-        self.yaw += yaw;
-        self.pitch -= pitch;
-
-        if self.pitch > 89. {
-            self.pitch = 89.;
-        } else if self.pitch < -89. {
-            self.pitch = -89.;
-        }
-
-        // Reference: https://learnopengl.com/code_viewer_gh.php?code=src/1.getting_started/7.3.camera_mouse_zoom/camera_mouse_zoom.cpp
-        // Go to function mouse_callback ^^^
-        let yr = self.yaw * PI / 180.;
-        let pr = self.pitch * PI / 180.;
-        let (ys, yc) = (yr.sin(), yr.cos());
-        let (ps, pc) = (pr.sin(), pr.cos());
-
-        self.front = glm::vec3(yc * pc, ps, ys * pc).normalize();
-    }
 }
 
 fn draw_ui(ui: &mut imgui::Ui) {
@@ -365,4 +285,13 @@ fn draw_ui(ui: &mut imgui::Ui) {
         .position([0., 0.], Condition::Appearing)
         .size([150., 80.], Condition::Appearing)
         .build(&ui, || {});
+}
+
+fn mat4_to_array(m: &glm::Mat4) -> [[f32; 4]; 4] {
+    [
+        [m[0], m[1], m[2], m[3]],
+        [m[4], m[5], m[6], m[7]],
+        [m[8], m[9], m[10], m[11]],
+        [m[12], m[13], m[14], m[15]],
+    ]
 }

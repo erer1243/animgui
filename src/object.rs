@@ -1,46 +1,43 @@
+/*
+This file contains the Object struct, representing one renderable 3D mesh along with attributes
+such as position, rotation, scale, color, etc. Contains all buffers and uniforms required for
+rendering the object.
+
+TODO:
+    * Getters and setters for rendering attributes that will cause model_mat to be generated
+      only when needed, rather than for every frame
+    * Keyframe animating. Maybe this should go in the object struct?
+*/
+use crate::mesh::Mesh;
+use crate::vertex::Vertex;
 use glium::{
-    implement_vertex, index::PrimitiveType::TrianglesList, Display, IndexBuffer, VertexBuffer,
+    index::PrimitiveType::TrianglesList, uniform, uniforms::Uniforms, Display, IndexBuffer,
+    VertexBuffer,
 };
 use nalgebra_glm as glm;
-use std::f32::consts::PI;
+use obj::{load_obj, Obj};
+use std::{fs::File, io::BufReader, path::Path};
+use crate::project::Id;
 
-implement_vertex!(Vertex, position);
-#[derive(Copy, Clone)]
-pub struct Vertex {
-    pub position: [f32; 3],
-}
-
-#[macro_export]
-macro_rules! vertices {
-    ($($n1:expr, $n2:expr, $n3:expr),+) => {
-        [
-            $(Vertex { position: [$n1, $n2, $n3 ] }),+
-        ]
-    };
-}
-
-// Drawable object
 pub struct Object {
+    // Rendering attributes
     pub position: glm::Vec3,
     pub rotation: glm::Vec3,
     pub scale: glm::Vec3,
     pub color: [f32; 3],
-    pub vb: VertexBuffer<Vertex>,
-    pub ib: IndexBuffer<u16>,
+
+    // Mesh data
+    pub mesh_id: Id,
 }
 
 impl Object {
-    pub fn new(display: &Display, data: &[Vertex], indices: &[u16]) -> Object {
-        let vb = VertexBuffer::new(display, data).unwrap();
-        let ib = IndexBuffer::new(display, TrianglesList, indices).unwrap();
-
+    pub fn new<T: ToString>(mesh_id: Id) -> Object {
         Object {
             position: glm::zero(),
             rotation: glm::zero(),
             scale: glm::vec3(1., 1., 1.),
             color: [1.; 3],
-            vb,
-            ib,
+            mesh_id,
         }
     }
 

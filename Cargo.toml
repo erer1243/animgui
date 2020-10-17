@@ -13,6 +13,7 @@ imgui-glium-renderer = "0.5.0"
 glium = "0.27.0"
 winit = "0.22.2"
 nalgebra-glm = "0.8.0"
+obj-rs = "0.6.2"
 
 # [profile.release]
 # panic = "abort"

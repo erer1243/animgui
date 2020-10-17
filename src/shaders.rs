@@ -1,3 +1,11 @@
+/*
+This file contains source code for GLSL shaders used for rendering.
+Currently they only provide solid-color rendering.
+
+TODO:
+    * Lighting (see vertex.rs too)
+    * Texturing (see vertex.rs too)
+*/
 pub const VERT_SHADER: &str = r#"
 #version 330 core
 
