@@ -4,14 +4,9 @@ animated and how.
 
 TODO:
 */
-use crate::mesh::Mesh;
-use crate::Object;
-use crate::Vertex;
+use crate::{mesh::Mesh, Object, Vertex};
 use glium::Display;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
 pub type Id = usize;
 
@@ -48,8 +43,7 @@ impl Project {
         );
 
         // Create mesh and object and add to project
-        let mesh = Mesh::new(display, name, &vertices, &obj.indices);
-
+        let _mesh = Mesh::new(display, name, &vertices, &obj.indices);
 
         Ok(())
     }

@@ -7,8 +7,6 @@ TODO: (these structs  are pretty simple, probably will not need any new features
 */
 use crate::vertex::Vertex;
 use glium::{index::PrimitiveType::TrianglesList, Display, IndexBuffer, VertexBuffer};
-use std::ops::Deref;
-use std::rc::Rc;
 
 pub struct Mesh {
     pub name: String,
@@ -23,7 +21,6 @@ impl Mesh {
         Mesh { name, vb, ib }
     }
 }
-
 
 // #[derive(Clone)]
 // pub struct Mesh(Rc<MeshInternals>);

@@ -8,16 +8,9 @@ TODO:
       only when needed, rather than for every frame
     * Keyframe animating. Maybe this should go in the object struct?
 */
-use crate::mesh::Mesh;
-use crate::vertex::Vertex;
-use glium::{
-    index::PrimitiveType::TrianglesList, uniform, uniforms::Uniforms, Display, IndexBuffer,
-    VertexBuffer,
-};
-use nalgebra_glm as glm;
-use obj::{load_obj, Obj};
-use std::{fs::File, io::BufReader, path::Path};
+
 use crate::project::Id;
+use nalgebra_glm as glm;
 
 pub struct Object {
     // Rendering attributes
