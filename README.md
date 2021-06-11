@@ -9,3 +9,5 @@ you can with the rainbow shader, ha ha.
 
 ![Screenshot one](/cube.png?raw=true "Screenshot one")
 ![Screenshot two](/cubesphere.png?raw=true "Screenshot two")
+![Screenshot three](/dragon.png?raw=true "Screenshot three")
+![Screenshot four](/dragon2.png?raw=true "Screenshot four")
