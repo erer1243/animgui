@@ -15,5 +15,5 @@ winit = "0.22.2"
 nalgebra-glm = "0.8.0"
 obj-rs = "0.6.2"
 
-# [profile.release]
-# panic = "abort"
+[profile.release]
+lto = true

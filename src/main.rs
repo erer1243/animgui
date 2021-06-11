@@ -9,29 +9,28 @@ TODO:
     * Adjustable camera move speed
     * Add axis markers, like in blender
 */
-// #![allow(dead_code)]
-// #![allow(unused_mut)]
-// #![allow(unused_imports)]
-// #![allow(unused_variables)]
 
+mod animation;
 mod camera;
 mod controls;
 mod mesh;
 mod object;
 mod project;
 mod shaders;
+mod ui;
 mod vertex;
 
+use animation::Frame;
 use camera::Camera;
 use controls::CameraControls;
 use glium::{glutin, program, uniform, Surface};
 use glutin::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{
-        ElementState::*,
+        ElementState::{Pressed, Released},
         Event,
         MouseButton::Right,
-        WindowEvent::{CloseRequested, CursorMoved, KeyboardInput, MouseInput},
+        WindowEvent::{CloseRequested, CursorMoved, KeyboardInput, MouseInput, Resized},
     },
     event_loop::ControlFlow,
 };
@@ -39,7 +38,7 @@ use nalgebra_glm as glm;
 use object::Object;
 use project::Project;
 use std::time::Instant;
-use vertex::Vertex;
+use ui::UIState;
 
 fn main() {
     // Make window
@@ -52,7 +51,7 @@ fn main() {
         let window_builder = glutin::window::WindowBuilder::new()
             .with_title("Anim")
             .with_inner_size(PhysicalSize {
-                width: 1000,
+                width: 1500,
                 height: 1000,
             })
             .with_resizable(false)
@@ -79,7 +78,7 @@ fn main() {
     // Load rendering stuff
     // =============================================================================================
     // Make shader program
-    let program = program!(&display,
+    let program = program! (&display,
         330 => {
             vertex: shaders::VERT_SHADER,
             fragment: shaders::FRAG_SHADER
@@ -87,17 +86,8 @@ fn main() {
     )
     .expect("Failed to compile shaders");
 
-    // Make triangle
-    // let triangle = Object::new(
-    //     &display,
-    //     Some("Triangle"),
-    //     &vertices!(-0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.0, 0.5, 0.0),
-    //     &[0, 1, 2],
-    // );
-
-    display.gl_window().window().set_visible(true);
-
     // Main loop state
+    // =============================================================================================
     // For imgui to know how long between frames
     let mut last_frame = Instant::now();
 
@@ -109,9 +99,22 @@ fn main() {
 
     // For keeping track of project data
     let mut project = Project::default();
-    // project
-    //     .load_obj_from_file(&display, "cube.obj")
-    //     .expect("Loading cube.obj");
+
+    // For ui to know what to draw
+    let mut ui_state = UIState::new();
+
+    // The current frame to draw objects with
+    let mut frame: Frame = 0;
+
+    project
+        .load_mesh_from_file(&display, "res/cube.obj")
+        .unwrap();
+    project
+        .load_mesh_from_file(&display, "res/sphere.obj")
+        .unwrap();
+
+    // Show window
+    display.gl_window().window().set_visible(true);
 
     // Main loop
     // =============================================================================================
@@ -128,7 +131,7 @@ fn main() {
 
             // Do imgui drawing
             let mut ui = imgui.frame();
-            draw_ui(&mut ui);
+            ui::draw(&mut ui, &mut project, &mut ui_state, &display, &mut frame);
             platform.prepare_render(&ui, display.gl_window().window());
 
             // Clear frame buffer
@@ -140,16 +143,16 @@ fn main() {
                 depth: glium::Depth {
                     test: glium::DepthTest::IfLess,
                     write: true,
-                    ..Default::default()
+                    ..glium::Depth::default()
                 },
-                ..Default::default()
+                ..glium::DrawParameters::default()
             };
 
             // Draw objects in project
-            for obj in project.objs.iter() {
+            for obj in &mut project.objs {
                 let uniforms = uniform! {
-                    color: obj.color,
-                    matrix: mat4_to_array(&(camera.camera_mat() * obj.model_mat()))
+                    color: [1., 1., 1.],
+                    matrix: mat4_to_array(&(camera.camera_mat() * obj.model_mat_at(0)))
                 };
 
                 target
@@ -226,20 +229,37 @@ fn main() {
         Event::WindowEvent {
             event: KeyboardInput { input, .. },
             ..
-        } => {
-            if controls.rmb_held() {
-                let is_pressed = input.state == Pressed;
+        } if controls.rmb_held() => {
+            let is_pressed = input.state == Pressed;
 
-                match input.scancode {
-                    17 => controls.w_input(is_pressed),
-                    30 => controls.a_input(is_pressed),
-                    31 => controls.s_input(is_pressed),
-                    32 => controls.d_input(is_pressed),
-                    42 => controls.shift_input(is_pressed),
-                    57 => controls.space_input(is_pressed),
-                    _ => (),
-                }
+            match input.scancode {
+                17 => controls.w_input(is_pressed),
+                30 => controls.a_input(is_pressed),
+                31 => controls.s_input(is_pressed),
+                32 => controls.d_input(is_pressed),
+                42 => controls.shift_input(is_pressed),
+                57 => controls.space_input(is_pressed),
+                _ => (),
             }
+        }
+
+        // Handle aspect ratio updates when window size changes
+        // =========================================================================================
+        Event::WindowEvent {
+            event: Resized(size),
+            window_id,
+        } => {
+            camera.update_aspect_ratio(size.width as f32 / size.height as f32);
+
+            // Pass aspect ratio change onto imgui
+            platform.handle_event::<()>(
+                imgui.io_mut(),
+                display.gl_window().window(),
+                &Event::WindowEvent {
+                    event: Resized(size),
+                    window_id,
+                },
+            );
         }
 
         // Handle exiting the program
@@ -274,15 +294,6 @@ fn main() {
 
         _ => (),
     });
-}
-
-fn draw_ui(ui: &mut imgui::Ui) {
-    use imgui::*;
-
-    Window::new(im_str!("Hello, window!"))
-        .position([0., 0.], Condition::Appearing)
-        .size([150., 80.], Condition::Appearing)
-        .build(&ui, || {});
 }
 
 fn mat4_to_array(m: &glm::Mat4) -> [[f32; 4]; 4] {

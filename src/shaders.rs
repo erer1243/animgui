@@ -3,6 +3,7 @@ This file contains source code for GLSL shaders used for rendering.
 Currently they only provide solid-color rendering.
 
 TODO:
+    * Re-add colors
     * Lighting (see vertex.rs too)
     * Texturing (see vertex.rs too)
 */
@@ -11,7 +12,7 @@ pub const VERT_SHADER: &str = r#"
 
 layout (location = 0) in vec3 position;
 uniform mat4 matrix;
-uniform vec3 color;
+// uniform vec3 color;
 out vec3 color_;
 
 void main() { color_ = (position+1)/2;
